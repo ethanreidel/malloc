@@ -3,11 +3,12 @@
 #include <ctype.h>
 #include <stddef.h>
 #include <unistd.h>
+#include <sys/mman.h>
 #include "malloc.h"
 #define MAX_MALLOC_SIZE (1000)
 
 
-static unsigned char mem_buffer[MAX_MALLOC_SIZE]; //create buffer of 1000 bytes (1 char burger 1 byte)
+//static unsigned char mem_buffer[MAX_MALLOC_SIZE]; //create buffer of 1000 bytes (1 char burger 1 byte)
 //one burger in one byte yummy
 
 
@@ -34,8 +35,9 @@ void print_mem_block(struct mem_block* block) {
 void init_malloc() {
 	//this function initializes the mem_block struct for the whole 0->max_malloc_size buffer
 	//char is used here because it is equal to 1 byte
-	
+	int fd = -1;
 
+	char* mem_buffer = mmap(NULL, MAX_MALLOC_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, fd, 0);		
 	//casts the buffer to a pointer to the struct mem_block
 	free_list_head = (struct mem_block *)mem_buffer;
 
@@ -44,10 +46,11 @@ void init_malloc() {
 	free_list_head->prev = NULL;
 	free_list_head->free = 1;
 
-	printf("sizeof membuffer: %ld", sizeof(mem_buffer));
-	//removes the space that is taken by the size of the record (32 bytes in theory)
-	free_list_head->size = sizeof(mem_buffer) - sizeof(struct mem_block); 
-	
+		//removes the space that is taken by the size of the record (32 bytes in theory)
+	//free_list_head->size = sizeof(mem_buffer) - sizeof(struct mem_block); 
+	free_list_head->size = MAX_MALLOC_SIZE - sizeof(struct mem_block);
+
+
 	//buffer points to memory spot exaclty after the record in this case
 	//mem_buffer == 0th pos of 1000 byte buffer + offset of 32 bytes to get next position
 	//printf("initial memory position before offset: %p\n", (char*)(mem_buffer));
@@ -126,13 +129,13 @@ void* new_malloc(size_t malloc_size) { //void* so we can cast malloc to specific
 
 
 	struct mem_block* free_space = find_free_block(&last, malloc_size);
-	printf("free space pointer: %p\n", free_space);
+
 	
 	
 	//creates record after previous 32 block record.
 	//does this by allocating a mem block at (buffer + size) location
 	//struct mem_block* malloc_struct = (struct mem_block*)(free_list_head->buffer+size);
-	/
+		
 
 	struct mem_block* malloc_struct = (struct mem_block*)(free_space->buffer+size);
 
@@ -142,7 +145,6 @@ void* new_malloc(size_t malloc_size) { //void* so we can cast malloc to specific
 	//malloc_struct->size = remaining_memory-size-sizeof(struct mem_block);
 	
 	malloc_struct->buffer = (char*)(malloc_struct+1);
-	printf("free block buffer: %p\n", malloc_struct->buffer);
 
 	malloc_struct->free = 1;
 
@@ -207,7 +209,7 @@ void insert_block(struct mem_block* block) {
 
 
 void new_free(void* buffer) { //free buffer created from new_malloc
-	
+		
 
 	if (buffer == NULL) {
 		printf("nothing to free.\n");
@@ -217,7 +219,10 @@ void new_free(void* buffer) { //free buffer created from new_malloc
 
 	//points to block of buffer passed in from function
 	struct mem_block* buffer_block = (struct mem_block*)((char *)buffer - sizeof(struct mem_block));
-
+	if (buffer_block->free == 1) {
+		perror("cannot free already free block!\n");
+		exit(1);
+	}
 	
 	total_allocated-= buffer_block->size + sizeof(struct mem_block);
 
@@ -254,13 +259,20 @@ int main(){
 	init_malloc();
 
 	char* arr = (char*)new_malloc(64);
-	char* arr1 = (char*)new_malloc(32);
+	char* arr1 = (char*)new_malloc(10);
 	char* arr2 = (char*)new_malloc(128);
-	char* arr3 = (char*)new_malloc(256);
-	
+	//char* arr3 = (char*)new_malloc(256);
+	for (int i = 0; i < 9; i++) {
+		arr1[i] = 'a' + i;
+	}
+	arr1[9] = 0;
+	printf("here is the string: %s\n", arr1); 
+
+
+
 	new_free(arr);
 	new_free(arr1);
-	new_free(arr3);
+	//new_free(arr3);
 	new_free(arr2);
 	print_free();	
 

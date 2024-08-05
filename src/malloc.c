@@ -132,6 +132,7 @@ void* new_malloc(size_t malloc_size) { //void* so we can cast malloc to specific
 	//creates record after previous 32 block record.
 	//does this by allocating a mem block at (buffer + size) location
 	//struct mem_block* malloc_struct = (struct mem_block*)(free_list_head->buffer+size);
+	/
 
 	struct mem_block* malloc_struct = (struct mem_block*)(free_space->buffer+size);
 
@@ -141,6 +142,7 @@ void* new_malloc(size_t malloc_size) { //void* so we can cast malloc to specific
 	//malloc_struct->size = remaining_memory-size-sizeof(struct mem_block);
 	
 	malloc_struct->buffer = (char*)(malloc_struct+1);
+	printf("free block buffer: %p\n", malloc_struct->buffer);
 
 	malloc_struct->free = 1;
 

@@ -96,16 +96,25 @@ size_t round_to_nearest_eighth(size_t x) {
 }
 
 
-void add_to_free_list(struct mem_block* block) {
-	block->next = free_list_head;
-	block->prev = NULL;
-	if (free_list_head != NULL) {
-		free_list_head->prev = block;
+void insert_block(struct mem_block* block) {
+	struct mem_block* current = free_list_head;
+	while (current != NULL && current < block) {
+		current = current->next;
+	}	
+	block->next = current;		
+	block->prev = current->prev;
+
+	if (current->prev != NULL) {
+		current->prev->next = block;
+	}
+	if (current != NULL) {
+		current->prev = block;
 	}
 
-	//free_list_head->prev = block;
-	free_list_head = block;
 }
+
+
+
 
 void* new_malloc(size_t malloc_size) { //void* so we can cast malloc to specific type e.g. (char*)new_malloc(104)
 	//size is in bytes so new_malloc(10) points to the beginning of a 10 byte location in mem_buffer
@@ -128,46 +137,37 @@ void* new_malloc(size_t malloc_size) { //void* so we can cast malloc to specific
 	}
 
 
-	struct mem_block* free_space = find_free_block(&last, malloc_size);
-
+	struct mem_block* free_space = find_free_block(&last, size);
 	
 	
 	//creates record after previous 32 block record.
 	//does this by allocating a mem block at (buffer + size) location
 	//struct mem_block* malloc_struct = (struct mem_block*)(free_list_head->buffer+size);
 		
-
-	struct mem_block* malloc_struct = (struct mem_block*)(free_space->buffer+size);
-
-	//make malloc_struct part of free_list
+	//add malloc_struct to free list
+	if (free_space->size >= size + sizeof(struct mem_block)) {
 	
-	malloc_struct->size = free_space->size-size-sizeof(struct mem_block);
-	//malloc_struct->size = remaining_memory-size-sizeof(struct mem_block);
-	
-	malloc_struct->buffer = (char*)(malloc_struct+1);
+		struct mem_block* malloc_struct = (struct mem_block*)(free_space->buffer+size);
+		malloc_struct->size = free_space->size-size-sizeof(struct mem_block);	
+		malloc_struct->buffer = (char*)(malloc_struct+1);
+		malloc_struct->free = 1;
+		malloc_struct->next = free_space->next;
+		malloc_struct->prev = free_space;
+		if (free_space->next) {
+			free_space->next->prev = malloc_struct;
+		}
+		
+		free_space->next = malloc_struct;
+		free_space->size = size;	
+	}
 
-	malloc_struct->free = 1;
+	free_space->free = 0;
 
-	//temp work here
-	//
-	
-
-
-
-
-	//below is previous work above 
-	//add new record to free list
-
-	malloc_struct->prev = free_list_head;
-	malloc_struct->next = NULL;
-	
-	free_list_head->next = malloc_struct;	
-	free_list_head->size = size;
-
+	if (free_space == free_list_head) {
+		free_list_head = free_space->next;
+	}
 	void* return_buffer = (void*)free_space->buffer;
-	free_list_head = malloc_struct;
-
-
+	
 	total_allocated += size + sizeof(struct mem_block);
 
 	return return_buffer;
@@ -190,22 +190,7 @@ void* merge_free_blocks(struct mem_block* free_block) {
 
 }
 
-void insert_block(struct mem_block* block) {
-	struct mem_block* current = free_list_head;
-	while (current != NULL && current < block) {
-		current = current->next;
-	}
-	block->next = current;
-	block->prev = current->prev;
 
-	if (current->prev != NULL) {
-		current->prev->next = block;
-	}
-	if (current != NULL) {
-		current->prev = block;
-	}
-
-}
 
 
 void new_free(void* buffer) { //free buffer created from new_malloc
@@ -219,10 +204,10 @@ void new_free(void* buffer) { //free buffer created from new_malloc
 
 	//points to block of buffer passed in from function
 	struct mem_block* buffer_block = (struct mem_block*)((char *)buffer - sizeof(struct mem_block));
-	if (buffer_block->free == 1) {
-		perror("cannot free already free block!\n");
-		exit(1);
-	}
+	//if (buffer_block->free == 1) {
+	//	perror("cannot free already free block!\n");
+	//	exit(1);
+	//}
 	
 	total_allocated-= buffer_block->size + sizeof(struct mem_block);
 
@@ -258,24 +243,16 @@ int main(){
 	
 	init_malloc();
 
-	char* arr = (char*)new_malloc(64);
-	char* arr1 = (char*)new_malloc(10);
-	char* arr2 = (char*)new_malloc(128);
-	//char* arr3 = (char*)new_malloc(256);
-	for (int i = 0; i < 9; i++) {
-		arr1[i] = 'a' + i;
-	}
-	arr1[9] = 0;
-	printf("here is the string: %s\n", arr1); 
+	char* a = (char*)new_malloc(64);
+	
+	char* a3 = (char*)new_malloc(128);
+	new_free(a);
+	char* arr = (char*)new_malloc(256);	
+	new_free(a3);
+	char* a2 = (char*)new_malloc(64);
 
 
-
-	new_free(arr);
-	new_free(arr1);
-	//new_free(arr3);
-	new_free(arr2);
 	print_free();	
-
 	return 0;
 }
 
